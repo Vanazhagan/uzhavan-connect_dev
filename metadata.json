@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Uzhavan Connect",
+  "description": "From Farm to Market, Directly Connected - Farmer-first digital agricultural marketplace and farm-services ecosystem for Tamil Nadu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
