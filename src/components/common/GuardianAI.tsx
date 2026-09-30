@@ -335,6 +335,193 @@ Ask me about your live account data (monthly sales, stock, pending offers, worke
 
     // 2. FARMER DATA QUERIES
     if (currentRole === 'farmer') {
+      const farmerOrders = orders.filter(
+        o => o.farmerId === currentUser.id || (o.farmerName && o.farmerName.toLowerCase() === currentUser.name.toLowerCase())
+      );
+
+      // Settled / Fully paid orders (farmer confirmed / settlement completed)
+      const settledOrders = farmerOrders.filter(
+        o => o.settlementStatus === 'settlement_completed' || (o.totalPaid >= o.cropValue && o.remainingBalance === 0 && o.orderStatus !== 'cancelled')
+      );
+
+      // Completed buyers list
+      const completedBuyerNames = Array.from(new Set(settledOrders.map(o => o.buyerName).filter(Boolean)));
+
+      // Unpaid / pending orders
+      const unpaidOrders = farmerOrders.filter(
+        o => (o.remainingBalance > 0 || o.settlementStatus === 'unpaid' || o.settlementStatus === 'partial_payment' || o.settlementStatus === 'awaiting_farmer_confirmation') && o.settlementStatus !== 'settlement_completed' && o.orderStatus !== 'cancelled'
+      );
+
+      // Confirmed payments received total
+      let confirmedReceivedAmount = 0;
+      farmerOrders.forEach(ord => {
+        if (ord.settlementStatus === 'settlement_completed') {
+          confirmedReceivedAmount += ord.cropValue;
+        } else if (ord.payments && ord.payments.length > 0) {
+          ord.payments.forEach(p => {
+            if (p.status === 'CONFIRMED_BY_FARMER') {
+              confirmedReceivedAmount += p.amount;
+            }
+          });
+        }
+      });
+
+      // Total pending balance
+      let totalPendingBalance = unpaidOrders.reduce((sum, o) => {
+        const rem = typeof o.remainingBalance === 'number' ? o.remainingBalance : Math.max(0, o.cropValue - (o.totalPaid || 0));
+        return sum + rem;
+      }, 0);
+
+      // Completed orders count
+      const completedOrders = farmerOrders.filter(
+        o => o.orderStatus === 'completed' || o.orderStatus === 'delivered' || o.settlementStatus === 'settlement_completed'
+      );
+
+      // Explicit Payment Query 1: "How many buyers completed payment?" / "Who completed payment?" / "buyers completed payment"
+      if (
+        qLower.includes('completed payment') ||
+        qLower.includes('complete payment') ||
+        qLower.includes('completed payments') ||
+        qLower.includes('payments completed') ||
+        qLower.includes('who completed payment') ||
+        qLower.includes('buyers completed payment') ||
+        qLower.includes('buyer completed payment') ||
+        qLower.includes('payment completed buyers') ||
+        qLower.includes('கட்டணம் முடித்த') ||
+        qLower.includes('கட்டணம் செலுத்திய')
+      ) {
+        if (completedBuyerNames.length > 0) {
+          return {
+            id: `resp_${Date.now()}`,
+            sender: 'assistant',
+            text: isTa
+              ? `உறுதிப்படுத்தப்பட்ட கட்டணம் முழுமையாக செலுத்திய வாங்குபவர்கள்: **${completedBuyerNames.length}** நபர்(கள்) (**${completedBuyerNames.join(', ')}**), பெறப்பட்ட மொத்த தொகை **₹${confirmedReceivedAmount.toLocaleString('en-IN')}**.`
+              : `**${completedBuyerNames.length}** buyer(s) have completed full payment: **${completedBuyerNames.join(', ')}** across ${settledOrders.length} fully settled order(s). Total confirmed received: **₹${confirmedReceivedAmount.toLocaleString('en-IN')}**.`,
+            timestamp: timeStr,
+            actionTab: 'orders',
+            actionTabLabel: isTa ? 'ஆர்டர்கள் & செட்டில்மென்ட் பார்க்க' : 'View Orders & Settlements',
+          };
+        } else {
+          return {
+            id: `resp_${Date.now()}`,
+            sender: 'assistant',
+            text: isTa
+              ? `தற்போது வரை எந்த வாங்குபவரும் முழு கட்டணத்தையும் செலுத்தவில்லை. உங்களிடம் **${unpaidOrders.length}** ஆர்டர்களில் நிலுவைக் கட்டணங்கள் உள்ளன (மொத்த நிலுவை: ₹${totalPendingBalance.toLocaleString('en-IN')}).`
+              : `No buyers have completed full payment yet. You currently have **${unpaidOrders.length}** order(s) awaiting payment completion (Total Pending: ₹${totalPendingBalance.toLocaleString('en-IN')}).`,
+            timestamp: timeStr,
+            actionTab: 'orders',
+            actionTabLabel: isTa ? 'ஆர்டர்கள் பார்க்க' : 'View Orders & Settlements',
+          };
+        }
+      }
+
+      // Explicit Payment Query 2: "How much payment have I received?" / "How much payment received?"
+      if (
+        (qLower.includes('received') || qLower.includes('பெறப்பட்டது') || qLower.includes('பெற்ற தொகை')) &&
+        (qLower.includes('payment') || qLower.includes('money') || qLower.includes('amount') || qLower.includes('பணம்') || qLower.includes('கட்டணம்') || qLower.includes('தொகை'))
+      ) {
+        return {
+          id: `resp_${Date.now()}`,
+          sender: 'assistant',
+          text: isTa
+            ? `நீங்கள் இதுவரை விவசாயியாக உறுதிப்படுத்திய மொத்த கட்டணம்: **₹${confirmedReceivedAmount.toLocaleString('en-IN')}**.`
+            : `You have received **₹${confirmedReceivedAmount.toLocaleString('en-IN')}** in farmer-confirmed settled payments across your orders.`,
+          timestamp: timeStr,
+          actionTab: 'orders',
+          actionTabLabel: isTa ? 'கட்டணங்கள் பார்க்க' : 'View Payments & Settlements',
+        };
+      }
+
+      // Explicit Payment Query 3: "How much payment is pending?" / "How many payments pending?"
+      if (
+        (qLower.includes('pending') || qLower.includes('நிலுவை')) &&
+        (qLower.includes('payment') || qLower.includes('payments') || qLower.includes('money') || qLower.includes('amount') || qLower.includes('balance') || qLower.includes('கட்டணம்') || qLower.includes('தொகை'))
+      ) {
+        return {
+          id: `resp_${Date.now()}`,
+          sender: 'assistant',
+          text: isTa
+            ? `உங்களுக்கு **${unpaidOrders.length}** ஆர்டர்களில் மொத்தம் **₹${totalPendingBalance.toLocaleString('en-IN')}** கட்டணம் நிலுவையில் உள்ளது.`
+            : `You have **${unpaidOrders.length}** order(s) with pending payment, with a total remaining balance of **₹${totalPendingBalance.toLocaleString('en-IN')}**.`,
+          timestamp: timeStr,
+          actionTab: 'orders',
+          actionTabLabel: isTa ? 'நிலுவை கட்டணங்கள் பார்க்க' : 'View Pending Settlements',
+        };
+      }
+
+      // Explicit Payment Query 4: "Which orders are settled?" / "How many payments are completed?"
+      if (
+        qLower.includes('settled') ||
+        (qLower.includes('completed') && (qLower.includes('payment') || qLower.includes('payments')))
+      ) {
+        if (settledOrders.length > 0) {
+          let listText = settledOrders.map((o, idx) => `${idx + 1}. Order #${o.id} - **${o.cropName}** (${o.buyerName}): ₹${o.cropValue.toLocaleString('en-IN')}`).join('\n');
+          return {
+            id: `resp_${Date.now()}`,
+            sender: 'assistant',
+            text: isTa
+              ? `### முழுமையாக முடிக்கப்பட்ட கட்டண ஆர்டர்கள் (${settledOrders.length}):\n${listText}`
+              : `### Fully Settled Orders (${settledOrders.length}):\n${listText}`,
+            timestamp: timeStr,
+            actionTab: 'orders',
+            actionTabLabel: isTa ? 'ஆர்டர்கள் பார்க்க' : 'View Orders',
+          };
+        } else {
+          return {
+            id: `resp_${Date.now()}`,
+            sender: 'assistant',
+            text: isTa
+              ? `தற்போது வரை முழுமையாக முடிக்கப்பட்ட செட்டில்மென்ட் ஆர்டர்கள் எதுவுமில்லை.`
+              : `No orders are fully settled yet. Pending orders are awaiting payment confirmation.`,
+            timestamp: timeStr,
+            actionTab: 'orders',
+            actionTabLabel: isTa ? 'ஆர்டர்கள் பார்க்க' : 'View Orders',
+          };
+        }
+      }
+
+      // Explicit Payment Query 5: "Which orders are unpaid?"
+      if (qLower.includes('unpaid') || (qLower.includes('unsettled') && qLower.includes('order'))) {
+        if (unpaidOrders.length > 0) {
+          let listText = unpaidOrders.map((o, idx) => `${idx + 1}. Order #${o.id} - **${o.cropName}** (${o.buyerName}): ₹${(o.remainingBalance || (o.cropValue - (o.totalPaid || 0))).toLocaleString('en-IN')} remaining unpaid`).join('\n');
+          return {
+            id: `resp_${Date.now()}`,
+            sender: 'assistant',
+            text: isTa
+              ? `### நிலுவை கட்டண ஆர்டர்கள் (${unpaidOrders.length}):\n${listText}`
+              : `### Unpaid / Pending Payment Orders (${unpaidOrders.length}):\n${listText}`,
+            timestamp: timeStr,
+            actionTab: 'orders',
+            actionTabLabel: isTa ? 'ஆர்டர்கள் பார்க்க' : 'View Orders',
+          };
+        } else {
+          return {
+            id: `resp_${Date.now()}`,
+            sender: 'assistant',
+            text: isTa
+              ? `உங்களிடம் நிலுவையில் உள்ள unpaid ஆர்டர்கள் எதுவுமில்லை!`
+              : `You have no unpaid orders. All current active orders are up to date!`,
+            timestamp: timeStr,
+            actionTab: 'orders',
+            actionTabLabel: isTa ? 'ஆர்டர்கள் பார்க்க' : 'View Orders',
+          };
+        }
+      }
+
+      // Explicit Payment Query 6: "How many orders completed?"
+      if (qLower.includes('orders completed') || qLower.includes('completed orders')) {
+        return {
+          id: `resp_${Date.now()}`,
+          sender: 'assistant',
+          text: isTa
+            ? `உங்களுக்கு மொத்தம் **${completedOrders.length}** முடிவடைந்த/விநியோகிக்கப்பட்ட ஆர்டர்கள் உள்ளன.`
+            : `You have **${completedOrders.length}** completed or delivered order(s) out of **${farmerOrders.length}** total order(s).`,
+          timestamp: timeStr,
+          actionTab: 'orders',
+          actionTabLabel: isTa ? 'ஆர்டர்கள் பார்க்க' : 'View Orders',
+        };
+      }
+
       // Monthly Sales Query
       if (
         (qLower.includes('month') || qLower.includes('மாதம்') || qLower.includes('மாத விற்பனை')) &&

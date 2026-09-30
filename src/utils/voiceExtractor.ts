@@ -40,45 +40,98 @@ export function interpretVoiceTranscript(
   transcript: string,
   language: 'en' | 'ta' = 'en'
 ): VoiceInterpretation {
-  const lower = transcript.toLowerCase().trim();
+  const norm = transcript.toLowerCase().trim();
 
-  // 1. LABOUR REQUIREMENT INTENT
-  const isLabour =
-    /worker|workers|labour|labourer|harvesting|weeding|climber|climbers|ஆட்கள்|வேலைக்காரர்கள்|வேலை ஆட்கள்|அறுவடைக்கு|வேலைக்கு|venum|tevai/i.test(
-      lower
-    ) &&
-    !/machine|rotavator|tractor|டிராக்டர்|ரொட்டவேட்டர்/i.test(lower);
+  // ----------------------------------------------------------------------
+  // 1. APPLICATION DATA QUERY & LIVE DATA QUESTIONS
+  // Must be checked FIRST before navigation or form pre-fill!
+  // Handles natural grammar variations like "how many buyers are completed payment"
+  // ----------------------------------------------------------------------
+  const isDataQuery =
+    // Question stems & counting keywords
+    /how many|how much|total|count|who completed|which orders|what is my|what is total|show my|tell me|who bought|purchased from|buyers count|payment status/i.test(norm) ||
+    // Specific payment / buyer / order status phrases
+    /completed payment|complete payment|completed payments|payments completed|payments are completed|who completed|buyers completed|buyer completed|payment completed|buyers purchased|buyers bought|purchased from me|bought from me|payment received|payments pending|payment pending|orders completed|orders settled|orders unpaid|settled orders|unpaid orders|stock remaining|remaining stock|sold out|monthly sale|annual sale|this month sale/i.test(norm) ||
+    // Tamil live-data query words
+    /எத்தனை|எவ்வளவு|யார்|எந்த|முடிந்த|நிலுவை|பெறப்பட்டது|வாங்கியவர்கள்|விற்பனை தொகை/i.test(norm);
 
-  // 2. MACHINERY REQUIREMENT INTENT
-  const isMachinery =
-    /rotavator|tractor|harvester|tiller|weeder|sprayer|drone|acre|acres|ரொட்டவேட்டர்|டிராக்டர்|இயந்திரம்|ஏக்கர்|eakar/i.test(
-      lower
-    );
+  // Check explicit navigation commands
+  const isExplicitNavCommand =
+    /^(open|go to|show|navigate to|திற|போ|செல்)\s+(buyer requirement|buyer requirements|my crops|machinery|worker bookings|orders|calendar|weather|marketplace|services|job requests)/i.test(norm);
 
-  // 3. MARKET PRICE INTENT
-  const isMarketPrice =
-    /price|rate|vilai|cost|விலை|விகிதம்|சந்தை/i.test(lower) &&
-    /what|how much|enna|என்ன|எவ்வளவு|show|கொள்ள/i.test(lower);
+  // ----------------------------------------------------------------------
+  // 2. EXPLICIT NAVIGATION COMMAND (ONLY when explicit)
+  // ----------------------------------------------------------------------
+  if (isExplicitNavCommand && !isDataQuery) {
+    let targetTab = 'home';
+    let labelEn = 'Navigate Page';
+    let labelTa = 'பக்கத்திற்கு செல்';
 
-  // 4. BUYER REQUIREMENT INTENT
-  const isBuyerReq = /buyer|buyers|requirement|requirements|கொள்முதல்|தேவை/i.test(lower) && !isLabour && !isMachinery;
+    if (/crop|crops|பயிர்/i.test(norm)) {
+      targetTab = 'myCrops';
+      labelEn = 'Navigate to My Crops';
+      labelTa = 'என் பயிர்கள் பக்கத்திற்கு செல்';
+    } else if (/order|orders|ஆர்டர்/i.test(norm)) {
+      targetTab = 'orders';
+      labelEn = 'Navigate to Orders & Settlement';
+      labelTa = 'ஆர்டர்கள் பக்கத்திற்கு செல்';
+    } else if (/requirement|requirements|தேவைகள்|கொள்முதல்/i.test(norm)) {
+      targetTab = 'requirements';
+      labelEn = 'Navigate to Buyer Requirements';
+      labelTa = 'கொள்முதல் தேவைகள் பக்கத்திற்கு செல்';
+    } else if (/machinery|machine|இயந்திரம்/i.test(norm)) {
+      targetTab = 'myMachinery';
+      labelEn = 'Navigate to Machinery Hub';
+      labelTa = 'இயந்திர மையம் பக்கத்திற்கு செல்';
+    } else if (/worker|labour|booking|வேலை/i.test(norm)) {
+      targetTab = 'services';
+      labelEn = 'Navigate to Labour Marketplace';
+      labelTa = 'தொழிலாளர் பக்கத்திற்கு செல்';
+    } else if (/calendar|நாட்காட்டி/i.test(norm)) {
+      targetTab = 'calendar';
+      labelEn = 'Navigate to Farm Calendar';
+      labelTa = 'பண்ணை நாட்காட்டிக்கு செல்';
+    } else if (/weather|வானிலை/i.test(norm)) {
+      targetTab = 'weather';
+      labelEn = 'Navigate to Farm Weather';
+      labelTa = 'வானிலை பக்கத்திற்கு செல்';
+    } else if (/market|marketplace|சந்தை/i.test(norm)) {
+      targetTab = 'marketplace';
+      labelEn = 'Navigate to Crop Marketplace';
+      labelTa = 'பயிர் சந்தைக்கு செல்';
+    }
 
-  // 5. NAVIGATION INTENT
-  const isNavigation = /open|go to|show|திற|காட்டு|போ/i.test(lower);
+    return {
+      intent: 'NAVIGATE',
+      intentLabelEn: labelEn,
+      intentLabelTa: labelTa,
+      transcript,
+      targetTab,
+    };
+  }
 
-  // Extract date helper
+  // ----------------------------------------------------------------------
+  // 3. APPLICATION DATA QUERY -> GUARDIAN AI
+  // ----------------------------------------------------------------------
+  if (isDataQuery) {
+    return {
+      intent: 'GUARDIAN_AI_QUERY',
+      intentLabelEn: 'Ask Guardian AI (Live App Data)',
+      intentLabelTa: 'கார்டியன் AI-யிடம் கேள் (நேரலை தரவு)',
+      transcript,
+    };
+  }
+
+  // Helpers for extraction
   const extractDate = (text: string): string => {
-    // Tomorrow check
     if (/tomorrow|நாளை|naalai/i.test(text)) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       return tomorrow.toISOString().split('T')[0];
     }
-    // Today check
     if (/today|இன்று|inru/i.test(text)) {
       return new Date().toISOString().split('T')[0];
     }
-    // Month + Day regex (e.g. "October 5", "Oct 5", "அக்டோபர் 5")
     const monthMap: Record<string, string> = {
       jan: '01', january: '01',
       feb: '02', february: '02',
@@ -115,9 +168,8 @@ export function interpretVoiceTranscript(
     return '2026-10-05';
   };
 
-  // Extract crop helper
   const extractCrop = (text: string): string => {
-    if (/coconut|தேங்காய்|thenkai|தேங்காய்/i.test(text)) return 'Coconut';
+    if (/coconut|தேங்காய்|thenkai/i.test(text)) return 'Coconut';
     if (/paddy|rice|நெல்|nel/i.test(text)) return 'Paddy';
     if (/sugarcane|கரும்பு|karumbu/i.test(text)) return 'Sugarcane';
     if (/banana|வாழை|vaazhai/i.test(text)) return 'Banana';
@@ -128,7 +180,6 @@ export function interpretVoiceTranscript(
     return 'Coconut';
   };
 
-  // Extract location helper
   const extractLocation = (text: string): string => {
     if (/pollachi|பொள்ளாச்சி/i.test(text)) return 'Pollachi, Coimbatore';
     if (/coimbatore|கோவை|கோயம்புத்தூர்/i.test(text)) return 'Coimbatore District';
@@ -139,12 +190,10 @@ export function interpretVoiceTranscript(
     return 'Pollachi, Coimbatore';
   };
 
-  // Extract numbers
   const extractNumber = (text: string, defaultNum: number = 6): number => {
     const numMatch = text.match(/(\d+)/);
     if (numMatch) return parseInt(numMatch[1], 10);
 
-    // Tamil & Thanglish word numbers
     if (/ஒன்று|oruthan|one/i.test(text)) return 1;
     if (/இரண்டு|rendu|two/i.test(text)) return 2;
     if (/மூன்று|moonu|three/i.test(text)) return 3;
@@ -159,22 +208,28 @@ export function interpretVoiceTranscript(
     return defaultNum;
   };
 
-  // Process LABOUR INTENT
-  if (isLabour) {
-    const crop = extractCrop(lower);
-    const workersNeeded = extractNumber(lower, 6);
-    const date = extractDate(lower);
-    const location = extractLocation(lower);
+  // ----------------------------------------------------------------------
+  // 4. LABOUR REQUIREMENT FORM PRE-FILL
+  // Explicit request for workers / labour
+  // ----------------------------------------------------------------------
+  const hasLabourKeywords = /worker|workers|labour|labourer|harvesting|weeding|climber|climbers|ஆட்கள்|வேலைக்காரர்கள்|வேலை ஆட்கள்/i.test(norm);
+  const hasRequestKeywords = /need|want|require|venum|tevai|வேண்டும்|தேவை/i.test(norm);
+
+  if (hasLabourKeywords && (hasRequestKeywords || /\d+/.test(norm))) {
+    const crop = extractCrop(norm);
+    const workersNeeded = extractNumber(norm, 6);
+    const date = extractDate(norm);
+    const location = extractLocation(norm);
 
     let workType = 'Harvesting';
-    if (/tree climbing|climbing|மரம் ஏறுதல்/i.test(lower)) workType = 'Coconut Tree Climbing';
-    else if (/weeding|களை எடுத்தல்/i.test(lower)) workType = 'Weeding & Field Cleaning';
-    else if (/spraying|தெளித்தல்/i.test(lower)) workType = 'Pesticide Spraying';
-    else if (/de-husking|dehusking|மட்டை உரித்தல்/i.test(lower)) workType = 'Coconut De-husking';
+    if (/tree climbing|climbing|மரம் ஏறுதல்/i.test(norm)) workType = 'Coconut Tree Climbing';
+    else if (/weeding|களை எடுத்தல்/i.test(norm)) workType = 'Weeding & Field Cleaning';
+    else if (/spraying|தெளித்தல்/i.test(norm)) workType = 'Pesticide Spraying';
+    else if (/de-husking|dehusking|மட்டை உரித்தல்/i.test(norm)) workType = 'Coconut De-husking';
 
     let timeSlot = '07:00 AM - 02:00 PM';
-    if (/evening|மாலை|maalai/i.test(lower)) timeSlot = '02:00 PM - 06:00 PM';
-    else if (/morning|காலை|kaalai/i.test(lower)) timeSlot = '07:00 AM - 02:00 PM';
+    if (/evening|மாலை|maalai/i.test(norm)) timeSlot = '02:00 PM - 06:00 PM';
+    else if (/morning|காலை|kaalai/i.test(norm)) timeSlot = '07:00 AM - 02:00 PM';
 
     return {
       intent: 'POST_LABOUR_REQ',
@@ -193,34 +248,39 @@ export function interpretVoiceTranscript(
     };
   }
 
-  // Process MACHINERY INTENT
-  if (isMachinery) {
-    const crop = extractCrop(lower);
-    const date = extractDate(lower);
-    const location = extractLocation(lower);
+  // ----------------------------------------------------------------------
+  // 5. MACHINERY REQUIREMENT FORM PRE-FILL
+  // Explicit request for machines
+  // ----------------------------------------------------------------------
+  const hasMachineKeywords = /rotavator|tractor|harvester|tiller|weeder|sprayer|drone|ரொட்டவேட்டர்|டிராக்டர்|இயந்திரம்/i.test(norm);
+
+  if (hasMachineKeywords && (hasRequestKeywords || /\d+/.test(norm) || /acre|acres|ஏக்கர்/i.test(norm))) {
+    const crop = extractCrop(norm);
+    const date = extractDate(norm);
+    const location = extractLocation(norm);
 
     let machineType = 'Rotavator';
     let attachment = 'Rotavator (42-Blade Rotary Tiller)';
-    if (/tractor|டிராக்டர்/i.test(lower)) {
+    if (/tractor|டிராக்டர்/i.test(norm)) {
       machineType = 'Tractor';
       attachment = '4WD Agricultural Tractor';
-    } else if (/harvester|ஹார்வெஸ்டர்/i.test(lower)) {
+    } else if (/harvester|ஹார்வெஸ்டர்/i.test(norm)) {
       machineType = 'Combine Harvester';
       attachment = 'Paddy Combine Harvester';
-    } else if (/drone|டிரோன்/i.test(lower)) {
+    } else if (/drone|டிரோன்/i.test(norm)) {
       machineType = 'Drone Sprayer';
       attachment = '10L Crop Spraying Drone';
-    } else if (/tiller|weeder|வீடர்/i.test(lower)) {
+    } else if (/tiller|weeder|வீடர்/i.test(norm)) {
       machineType = 'Power Weeder';
       attachment = 'Rotary Power Weeder';
     }
 
-    const areaMatch = lower.match(/(\d+)\s*(acres|acre|ஏக்கர்|eakar)/i);
+    const areaMatch = norm.match(/(\d+)\s*(acres|acre|ஏக்கர்|eakar)/i);
     const area = areaMatch ? `${areaMatch[1]} Acres` : '3 Acres';
 
     let timeSlot = '08:00 AM - 12:00 PM';
-    if (/morning|காலை|kaalai/i.test(lower)) timeSlot = '08:00 AM - 12:00 PM';
-    else if (/afternoon|evening|மாலை/i.test(lower)) timeSlot = '02:00 PM - 06:00 PM';
+    if (/morning|காலை|kaalai/i.test(norm)) timeSlot = '08:00 AM - 12:00 PM';
+    else if (/afternoon|evening|மாலை/i.test(norm)) timeSlot = '02:00 PM - 06:00 PM';
 
     return {
       intent: 'POST_MACHINERY_REQ',
@@ -240,9 +300,11 @@ export function interpretVoiceTranscript(
     };
   }
 
-  // Process MARKET PRICE LOOKUP
-  if (isMarketPrice) {
-    const crop = extractCrop(lower);
+  // ----------------------------------------------------------------------
+  // 6. MARKET PRICE LOOKUP
+  // ----------------------------------------------------------------------
+  if (/price|rate|vilai|cost|விலை|விகிதம்|சந்தை/i.test(norm) && /what|how much|enna|என்ன|எவ்வளவு|show|check/i.test(norm)) {
+    const crop = extractCrop(norm);
     return {
       intent: 'LOOKUP_MARKET_PRICE',
       intentLabelEn: `Lookup Market Price for ${crop}`,
@@ -253,9 +315,11 @@ export function interpretVoiceTranscript(
     };
   }
 
-  // Process BUYER REQUIREMENT LOOKUP
-  if (isBuyerReq) {
-    const crop = extractCrop(lower);
+  // ----------------------------------------------------------------------
+  // 7. BUYER REQUIREMENT LOOKUP
+  // ----------------------------------------------------------------------
+  if (/buyer|buyers|requirement|requirements|கொள்முதல்|தேவை/i.test(norm) && /search|lookup|view|show/i.test(norm)) {
+    const crop = extractCrop(norm);
     return {
       intent: 'LOOKUP_BUYER_REQ',
       intentLabelEn: `View Buyer Requirements for ${crop}`,
@@ -266,48 +330,9 @@ export function interpretVoiceTranscript(
     };
   }
 
-  // Process NAVIGATION
-  if (isNavigation) {
-    let targetTab = 'home';
-    let labelEn = 'Navigate Page';
-    let labelTa = 'பக்கத்திற்கு செல்';
-
-    if (/crop|crops|பயிர்/i.test(lower)) {
-      targetTab = 'myCrops';
-      labelEn = 'Navigate to My Crops';
-      labelTa = 'என் பயிர்கள் பக்கத்திற்கு செல்';
-    } else if (/order|orders|ஆர்டர்/i.test(lower)) {
-      targetTab = 'orders';
-      labelEn = 'Navigate to Orders & Settlement';
-      labelTa = 'ஆர்டர்கள் பக்கத்திற்கு செல்';
-    } else if (/calendar|நாட்காட்டி/i.test(lower)) {
-      targetTab = 'calendar';
-      labelEn = 'Navigate to Farm Calendar';
-      labelTa = 'பண்ணை நாட்காட்டிக்கு செல்';
-    } else if (/weather|வானிலை/i.test(lower)) {
-      targetTab = 'weather';
-      labelEn = 'Navigate to Farm Weather';
-      labelTa = 'வானிலை பக்கத்திற்கு செல்';
-    } else if (/market|marketplace|சந்தை/i.test(lower)) {
-      targetTab = 'marketplace';
-      labelEn = 'Navigate to Crop Marketplace';
-      labelTa = 'பயிர் சந்தைக்கு செல்';
-    } else if (/service|services|சேவைகள்/i.test(lower)) {
-      targetTab = 'services';
-      labelEn = 'Navigate to Farm Services';
-      labelTa = 'பண்ணை சேவைகளுக்கு செல்';
-    }
-
-    return {
-      intent: 'NAVIGATE',
-      intentLabelEn: labelEn,
-      intentLabelTa: labelTa,
-      transcript,
-      targetTab,
-    };
-  }
-
-  // Default: GUARDIAN AI QUERY
+  // ----------------------------------------------------------------------
+  // 8. FALLBACK TO GUARDIAN AI QUERY
+  // ----------------------------------------------------------------------
   return {
     intent: 'GUARDIAN_AI_QUERY',
     intentLabelEn: 'Ask Guardian AI',
