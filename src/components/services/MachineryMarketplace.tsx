@@ -20,6 +20,7 @@ import {
   Sparkles,
   Layers,
   Clock3,
+  Mic,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { MachineItem, MachineryBooking, MachineryRequirement } from '../../types';
@@ -54,6 +55,9 @@ export const MachineryMarketplace: React.FC = () => {
     switchRole,
     selectedMachineForCalendar,
     setSelectedMachineForCalendar,
+    voicePreFill,
+    setVoicePreFill,
+    setIsVoiceAssistantOpen,
   } = useApp();
 
   const isMachineryRole = currentRole === 'machinery';
@@ -104,6 +108,28 @@ export const MachineryMarketplace: React.FC = () => {
   const [reqBudget, setReqBudget] = useState(3400);
   const [reqNotes, setReqNotes] = useState('Need heavy rotavator for wet paddy puddling.');
   const [reqFeedback, setReqFeedback] = useState<string | null>(null);
+
+  // Handle Voice Assistant Pre-fill
+  React.useEffect(() => {
+    if (voicePreFill && voicePreFill.intent === 'POST_MACHINERY_REQ' && voicePreFill.machineryDetails) {
+      const details = voicePreFill.machineryDetails;
+      setReqMachineType(details.machineType || 'Rotavator');
+      setReqAttachment(details.attachment || 'Rotavator (42-Blade)');
+      setReqCrop(details.crop || 'Paddy');
+      setReqDate(details.date || '2026-10-06');
+      setReqTimeSlot(details.timeSlot || '08:00 AM - 12:00 PM');
+      if (details.area) setReqAcreage(details.area);
+      if (details.location) setReqLocation(details.location);
+      if (details.notes) setReqNotes(details.notes);
+
+      // Open post requirement modal for manual confirmation
+      setShowPostReqModal(true);
+      setActiveSubTab('incoming_requirements');
+
+      // Clear voicePreFill
+      setVoicePreFill(null);
+    }
+  }, [voicePreFill]);
 
   // Provider Requirement Response State
   const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
@@ -294,6 +320,15 @@ export const MachineryMarketplace: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsVoiceAssistantOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+            title="Voice Post Machinery Need"
+          >
+            <Mic className="w-4 h-4 text-emerald-800 animate-pulse" />
+            <span>🎤 {isTa ? 'குரல் இயந்திர தேவை' : 'Voice Post Need'}</span>
+          </button>
+
           <button
             onClick={() => setShowPostReqModal(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-bold transition-colors cursor-pointer shadow-2xs"

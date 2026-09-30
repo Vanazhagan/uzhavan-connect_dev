@@ -8,22 +8,46 @@ import {
   Clock,
   ArrowRight,
   ExternalLink,
+  Phone,
+  MessageSquare,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { TrustRingAvatar } from '../common/TrustRingAvatar';
 import { Order, PaymentRecord } from '../../types';
+import { SEED_FARMERS, SEED_BUYERS } from '../../data/seedData';
 
 export const OrdersAndSettlementView: React.FC = () => {
   const {
     t,
     orders,
     currentRole,
+    currentUser,
     recordBuyerPayment,
     confirmFarmerPaymentReceipt,
     raisePaymentDispute,
     digitalTransactionRecord,
     setDigitalTransactionRecord,
   } = useApp();
+
+  // Helper to resolve distinct user profiles
+  const allSeedUsers = [...SEED_FARMERS, ...SEED_BUYERS];
+  const findUserById = (id?: string, name?: string) => {
+    if (id) {
+      if (currentUser.id === id) return currentUser;
+      const found = allSeedUsers.find(u => u.id === id);
+      if (found) return found;
+    }
+    if (name) {
+      if (currentUser.name.toLowerCase().includes(name.toLowerCase())) return currentUser;
+      const found = allSeedUsers.find(
+        u =>
+          u.name.toLowerCase().includes(name.toLowerCase()) ||
+          (u.businessName && u.businessName.toLowerCase().includes(name.toLowerCase()))
+      );
+      if (found) return found;
+    }
+    return null;
+  };
 
   // Role checks
   const isBuyer = currentRole === 'buyer';
@@ -123,6 +147,16 @@ export const OrdersAndSettlementView: React.FC = () => {
             : `${order.quantityKg.toLocaleString('en-IN')} ${order.unit || 'KG'} ${order.cropName}`;
           const priceUnitStr = isCoconut ? 'Coconut' : (order.unit || 'KG');
 
+          // Resolve Farmer and Buyer user profiles distinctly
+          const farmerUser = findUserById(order.farmerId, order.farmerName);
+          const buyerUser = findUserById(order.buyerId, order.buyerName);
+
+          const farmerDisplayName = farmerUser?.name || order.farmerName;
+          const farmerMobile = farmerUser?.mobile || '9842154321';
+
+          const buyerDisplayName = buyerUser?.businessName || buyerUser?.name || order.buyerName;
+          const buyerMobile = buyerUser?.mobile || '9843011223';
+
           return (
             <div
               key={order.id}
@@ -183,21 +217,118 @@ export const OrdersAndSettlementView: React.FC = () => {
               {/* Farmer and Buyer Profile Row with Trust Rings */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <div className="flex items-center gap-3">
-                  <TrustRingAvatar user={{ name: order.farmerName }} trust={order.farmerTrust} size="md" />
+                  <TrustRingAvatar
+                    user={
+                      farmerUser || {
+                        name: farmerDisplayName,
+                        role: 'farmer',
+                        district: 'Coimbatore',
+                        trust: order.farmerTrust,
+                      }
+                    }
+                    size="md"
+                  />
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-500 block">Farmer / Seller</span>
-                    <h4 className="text-xs font-bold text-slate-900">{order.farmerName}</h4>
-                    <span className="text-[11px] text-emerald-800 font-medium">{order.farmerTrust.title}</span>
+                    <h4 className="text-xs font-bold text-slate-900">{farmerDisplayName}</h4>
+                    <span className="text-[11px] text-emerald-800 font-medium">{order.farmerTrust?.title || 'Verified Farmer'}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <TrustRingAvatar user={{ name: order.buyerName }} trust={order.buyerTrust} size="md" />
+                  <TrustRingAvatar
+                    user={
+                      buyerUser || {
+                        name: buyerDisplayName,
+                        role: 'buyer',
+                        district: 'Coimbatore',
+                        trust: order.buyerTrust,
+                      }
+                    }
+                    size="md"
+                  />
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-500 block">Buyer / Purchaser</span>
-                    <h4 className="text-xs font-bold text-slate-900">{order.buyerName}</h4>
-                    <span className="text-[11px] text-emerald-800 font-medium">{order.buyerTrust.title}</span>
+                    <h4 className="text-xs font-bold text-slate-900">{buyerDisplayName}</h4>
+                    <span className="text-[11px] text-emerald-800 font-medium">{order.buyerTrust?.title || 'Verified Buyer'}</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Confirmed Order Direct Contact Unlock Section */}
+              <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-800 text-amber-200 flex items-center justify-center font-bold shrink-0">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded">
+                        ✓ Order Confirmed · Direct Contact Unlocked
+                      </span>
+                    </div>
+                    {isFarmer || currentUser.id === order.farmerId ? (
+                      <div className="mt-1">
+                        <span className="text-slate-600">Buyer Contact: </span>
+                        <strong className="text-slate-900 font-bold">{buyerDisplayName}</strong>
+                        <span className="text-emerald-900 font-bold ml-2">({buyerMobile})</span>
+                      </div>
+                    ) : isBuyer || currentUser.id === order.buyerId ? (
+                      <div className="mt-1">
+                        <span className="text-slate-600">Farmer Contact: </span>
+                        <strong className="text-slate-900 font-bold">{farmerDisplayName}</strong>
+                        <span className="text-emerald-900 font-bold ml-2">({farmerMobile})</span>
+                      </div>
+                    ) : (
+                      <div className="mt-1 space-x-3 text-slate-700">
+                        <span>Farmer: <strong>{farmerDisplayName}</strong> ({farmerMobile})</span>
+                        <span>·</span>
+                        <span>Buyer: <strong>{buyerDisplayName}</strong> ({buyerMobile})</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  {isFarmer || currentUser.id === order.farmerId ? (
+                    <>
+                      <a
+                        href={`tel:${buyerMobile}`}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Call Buyer ({buyerMobile})</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/91${buyerMobile}?text=${encodeURIComponent(`Hello ${buyerDisplayName}, regarding Order #${order.id.toUpperCase()} (${order.cropName})`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold transition-colors border border-emerald-300 shadow-2xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>WhatsApp Buyer</span>
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        href={`tel:${farmerMobile}`}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Call Farmer ({farmerMobile})</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/91${farmerMobile}?text=${encodeURIComponent(`Hello ${farmerDisplayName}, regarding Order #${order.id.toUpperCase()} (${order.cropName})`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold transition-colors border border-emerald-300 shadow-2xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>WhatsApp Farmer</span>
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
 

@@ -18,6 +18,7 @@ import {
   Briefcase,
   Layers,
   ArrowRight,
+  Mic,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { TrustRingAvatar } from '../common/TrustRingAvatar';
@@ -40,6 +41,9 @@ export const WorkerMarketplace: React.FC = () => {
     currentUser,
     currentRole,
     switchRole,
+    voicePreFill,
+    setVoicePreFill,
+    setIsVoiceAssistantOpen,
   } = useApp();
 
   const isWorkerRole = currentRole === 'worker';
@@ -79,6 +83,27 @@ export const WorkerMarketplace: React.FC = () => {
   const [reqExpectedWage, setReqExpectedWage] = useState(600);
   const [reqNotes, setReqNotes] = useState('Urgent harvesting for 2,000 coconuts grove. Direct farm payment.');
   const [postFeedback, setPostFeedback] = useState<string | null>(null);
+
+  // Handle Voice Assistant Pre-fill
+  React.useEffect(() => {
+    if (voicePreFill && voicePreFill.intent === 'POST_LABOUR_REQ' && voicePreFill.labourDetails) {
+      const details = voicePreFill.labourDetails;
+      setReqCrop(details.crop || 'Coconut');
+      setReqWorkType(details.workType || 'Coconut Harvesting');
+      setReqWorkersNeeded(details.workersNeeded || 6);
+      setReqDate(details.date || '2026-10-05');
+      setReqTimeSlot(details.timeSlot || '07:00 AM - 02:00 PM');
+      setReqLocation(details.location || 'Pollachi, Coimbatore');
+      if (details.notes) setReqNotes(details.notes);
+
+      // Open post requirement modal for manual confirmation
+      setShowPostRequirementModal(true);
+      setActiveSubTab('labour_requirements');
+
+      // Clear voicePreFill
+      setVoicePreFill(null);
+    }
+  }, [voicePreFill]);
 
   const skillsList = [
     'All',
@@ -236,13 +261,24 @@ export const WorkerMarketplace: React.FC = () => {
 
         <div className="flex items-center gap-2 flex-wrap">
           {!isWorkerRole && (
-            <button
-              onClick={() => setShowPostRequirementModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-amber-700" />
-              <span>Post Labour Requirement</span>
-            </button>
+            <>
+              <button
+                onClick={() => setIsVoiceAssistantOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 text-xs font-bold transition-colors cursor-pointer"
+                title="Voice Post Labour Requirement"
+              >
+                <Mic className="w-4 h-4 text-emerald-800 animate-pulse" />
+                <span>🎤 {language === 'ta' ? 'குரல் ஆட்கள் தேவை' : 'Voice Post Labour'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowPostRequirementModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-amber-700" />
+                <span>Post Labour Requirement</span>
+              </button>
+            </>
           )}
 
           {/* Quick role-view switcher for prototype testing */}

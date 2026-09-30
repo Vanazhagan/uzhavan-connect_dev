@@ -8,6 +8,7 @@ import {
   LogOut,
   Settings,
   HelpCircle,
+  Mic,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { TrustRingAvatar } from './TrustRingAvatar';
@@ -29,6 +30,7 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({ onOpenAuthModal })
     setActiveTab,
     notifications,
     markNotificationRead,
+    setIsVoiceAssistantOpen,
   } = useApp();
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
@@ -157,8 +159,18 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({ onOpenAuthModal })
           })}
         </nav>
 
-        {/* Zone 3: 1-2 Primary Actions (Language switch, Notifications, Role Switcher / Profile) */}
+        {/* Zone 3: Primary Actions (Voice Assistant, Language switch, Notifications, Role Switcher / Profile) */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Voice Assistant Trigger Button */}
+          <button
+            onClick={() => setIsVoiceAssistantOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-950 transition-colors cursor-pointer shadow-2xs"
+            title="Uzhavan Voice Assistant / குரல் உதவி"
+          >
+            <Mic className="w-3.5 h-3.5 text-amber-800 animate-pulse" />
+            <span>{language === 'ta' ? 'குரல் உதவி' : 'Voice Assistant'}</span>
+          </button>
+
           {/* Bilingual Language Switcher */}
           <button
             onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}

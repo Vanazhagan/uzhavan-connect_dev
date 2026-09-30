@@ -58,6 +58,8 @@ import {
 import { TRANSLATIONS } from '../i18n/translations';
 import { ASSET_IMAGES } from '../assets/images';
 
+import { VoiceInterpretation } from '../utils/voiceExtractor';
+
 interface FavouritesMap {
   farmers: string[];
   workers: string[];
@@ -202,6 +204,14 @@ interface AppContextType {
   triggerSoldOutCelebration: () => void;
   digitalTransactionRecord: DigitalTransactionRecord | null;
   setDigitalTransactionRecord: (rec: DigitalTransactionRecord | null) => void;
+
+  // Voice Assistant Global State
+  isVoiceAssistantOpen: boolean;
+  setIsVoiceAssistantOpen: (open: boolean) => void;
+  voicePreFill: VoiceInterpretation | null;
+  setVoicePreFill: (data: VoiceInterpretation | null) => void;
+  voiceTranscriptForGuardian: string | null;
+  setVoiceTranscriptForGuardian: (transcript: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -467,6 +477,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getStored('favourites', { farmers: ['user_farmer_kumar'], workers: ['worker_marimuthu'], machinery: ['mach_tractor_01'], stores: ['store_cauvery_bio'] })
   );
   const [selectedMachineForCalendar, setSelectedMachineForCalendar] = useState<MachineItem | null>(null);
+
+  // Voice Assistant Global State
+  const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
+  const [voicePreFill, setVoicePreFill] = useState<VoiceInterpretation | null>(null);
+  const [voiceTranscriptForGuardian, setVoiceTranscriptForGuardian] = useState<string | null>(null);
 
   // Helper to resolve consistent demo user profile per role
   const getDemoUserForRole = (role: UserRole): UserProfile => {
@@ -3227,6 +3242,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerSoldOutCelebration,
         digitalTransactionRecord,
         setDigitalTransactionRecord,
+        isVoiceAssistantOpen,
+        setIsVoiceAssistantOpen,
+        voicePreFill,
+        setVoicePreFill,
+        voiceTranscriptForGuardian,
+        setVoiceTranscriptForGuardian,
       }}
     >
       {children}

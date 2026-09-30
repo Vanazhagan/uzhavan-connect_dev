@@ -5,6 +5,7 @@ import { BottomNavigation } from './components/common/BottomNavigation';
 import { DemoStoryBanner } from './components/common/DemoStoryBanner';
 import { WhyTrustRingModal } from './components/common/WhyTrustRingModal';
 import { GuardianAI } from './components/common/GuardianAI';
+import { VoiceAssistantModal } from './components/common/VoiceAssistantModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { LandingPage } from './components/landing/LandingPage';
 import { FarmerDashboard } from './components/farmer/FarmerDashboard';
@@ -38,7 +39,16 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { UserProfileView } from './components/profile/UserProfileView';
 
 const MainAppContent: React.FC = () => {
-  const { currentRole, activeTab, setActiveTab, t } = useApp();
+  const {
+    currentRole,
+    activeTab,
+    setActiveTab,
+    t,
+    isVoiceAssistantOpen,
+    setIsVoiceAssistantOpen,
+    setVoicePreFill,
+    setVoiceTranscriptForGuardian,
+  } = useApp();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showLandingView, setShowLandingView] = useState(false);
 
@@ -181,6 +191,18 @@ const MainAppContent: React.FC = () => {
 
       {/* Guardian AI Safety & App Assistant Drawer */}
       <GuardianAI />
+
+      {/* Uzhavan Voice Assistant Modal */}
+      <VoiceAssistantModal
+        isOpen={isVoiceAssistantOpen}
+        onClose={() => setIsVoiceAssistantOpen(false)}
+        onConfirmPreFill={interpretation => {
+          setVoicePreFill(interpretation);
+        }}
+        onAskGuardian={transcript => {
+          setVoiceTranscriptForGuardian(transcript);
+        }}
+      />
 
       {/* Authentication & Role Registration Modal */}
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />

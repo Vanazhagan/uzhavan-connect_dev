@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   User,
   Bot,
+  Mic,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
@@ -93,6 +94,9 @@ export const GuardianAI: React.FC = () => {
     orders,
     notifications,
     favourites,
+    setIsVoiceAssistantOpen,
+    voiceTranscriptForGuardian,
+    setVoiceTranscriptForGuardian,
   } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -268,6 +272,15 @@ Ask me about your live account data (monthly sales, stock, pending offers, worke
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [currentMessages, isOpen]);
+
+  // Handle Voice Assistant query passed into Guardian AI
+  useEffect(() => {
+    if (voiceTranscriptForGuardian && voiceTranscriptForGuardian.trim()) {
+      setIsOpen(true);
+      handleSendMessage(voiceTranscriptForGuardian);
+      setVoiceTranscriptForGuardian(null);
+    }
+  }, [voiceTranscriptForGuardian]);
 
   // LIVE CONTEXT-AWARE RESPONSE ENGINE
   const generateGuardianResponse = (userQuery: string): Message => {
@@ -1164,6 +1177,13 @@ Ask me specifically about your monthly sales, remaining stock, buyer offers, or 
 
             {/* Input Bar */}
             <div className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+              <button
+                onClick={() => setIsVoiceAssistantOpen(true)}
+                className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 rounded-xl transition-all cursor-pointer shrink-0"
+                title="Voice Query / குரல் கேள்வி"
+              >
+                <Mic className="w-4 h-4 text-amber-800" />
+              </button>
               <input
                 type="text"
                 value={inputQuery}
